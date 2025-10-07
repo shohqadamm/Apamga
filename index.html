@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Sonli Sarguzasht (0–20)</title>
+  <style>
+    :root{
+      --bg:#e8f7ff; --grass:#c7f0b4; --even:#4aa3ff; --odd:#ff6b6b; --card:#fff;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;}
+    body{background:linear-gradient(#e8f7ff,#fff);display:flex;align-items:center;justify-content:center;padding:12px}
+    .game{width:100%;max-width:820px;background:linear-gradient(#fff,#f9fffb);box-shadow:0 12px 30px rgba(0,0,0,0.08);border-radius:14px;padding:16px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    h1{font-size:20px;margin:0;color:#0b3a66}
+    .score{font-weight:700;color:#0b3a66}
+    .play-area{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+    .sky{min-height:200px;border-radius:12px;background:linear-gradient(#bfe9ff,#e8f7ff);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;padding:14px}
+    .number-card{width:120px;height:120px;border-radius:12px;background:var(--card);display:flex;align-items:center;justify-content:center;font-size:52px;font-weight:900;box-shadow:0 8px 20px rgba(0,0,0,0.12);touch-action:none;user-select:none}
+    .houses{display:flex;gap:20px;align-items:flex-end;justify-content:center;padding:10px;background:linear-gradient(#fff,#f7fff7);border-radius:10px}
+    .house{width:200px;height:150px;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:12px;box-shadow:0 8px 18px rgba(0,0,0,0.08);color:white;font-weight:800;position:relative}
+    .label{background:rgba(255,255,255,0.14);padding:8px 14px;border-radius:999px;font-size:18px}
+    .grass{height:40px;background:var(--grass);border-radius:10px;margin-top:8px;display:flex;align-items:center;justify-content:center;color:#145214;font-weight:800;padding:0 10px}
+    .controls{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:8px}
+    .btn{background:#0b75d9;color:white;padding:8px 12px;border-radius:8px;border:none;font-weight:700;cursor:pointer}
+    .small{font-size:14px;padding:6px 10px}
+    .pop{animation:pop .55s ease}
+    @keyframes pop{0%{transform:scale(.7);opacity:0}60%{transform:scale(1.04);opacity:1}100%{transform:scale(1)}}
+    .hint{font-size:13px;color:#444;margin-top:6px;text-align:center}
+    @media (max-width:520px){
+      .number-card{width:94px;height:94px;font-size:38px}
+      .house{width:140px;height:120px}
+    }
+  </style>
+</head>
+<body>
+  <div class="game" role="application" aria-label="Sonli Sarguzasht 0 dan 20 gacha">
+    <header>
+      <h1>Sonli sarguzasht 🌟 (0–20)</h1>
+      <div class="score">To'g'ri: <span id="correct">0</span> / <span id="total">0</span></div>
+    </header>
+
+    <div class="play-area">
+      <div class="sky" id="sky">
+        <div id="number" class="number-card" role="button" tabindex="0">10</div>
+      </div>
+
+      <div class="houses" aria-hidden="false">
+        <div id="oddHouse" class="house" style="background:var(--odd)">
+          <div class="label">Toq uycha</div>
+          <div class="grass">Toq</div>
+        </div>
+
+        <div id="evenHouse" class="house" style="background:var(--even)">
+          <div class="label">Juft uycha</div>
+          <div class="grass">Juft</div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <div>
+          <button id="nextBtn" class="btn small">Keyingi</button>
+          <button id="resetBtn" class="btn small" style="background:#5cb85c">Qayta</button>
+        </div>
+        <div style="color:#666;font-size:14px">Yoshi: 5–6 yosh</div>
+      </div>
+      <div class="hint">Raqamni ushlab, mos uycha ustiga olib boring yoki uychani bosing.</div>
+    </div>
+  </div>
+
+  <script>
+    // Game supporting numbers 0-20, drag & drop + touch tapping, Uzbek speech synthesis fallback.
+    const numberEl = document.getElementById('number');
+    const oddHouse = document.getElementById('oddHouse');
+    const evenHouse = document.getElementById('evenHouse');
+    const correctSpan = document.getElementById('correct');
+    const totalSpan = document.getElementById('total');
+    const nextBtn = document.getElementById('nextBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    let correct = 0, total = 0, current = 10;
+    const synth = window.speechSynthesis;
+
+    function speak(txt){
+      if(!synth) return;
+      const u = new SpeechSynthesisUtterance(txt);
+      u.lang = 'uz-UZ';
+      u.rate = 0.95;
+      u.pitch = 1.05;
+      synth.cancel();
+      synth.speak(u);
+    }
+
+    function randInt(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
+
+    function newNumber(){
+      current = randInt(0,20);
+      numberEl.textContent = current;
+      numberEl.classList.remove('pop');
+      void numberEl.offsetWidth;
+      numberEl.classList.add('pop');
+    }
+
+    function updateScore(){ correctSpan.textContent = correct; totalSpan.textContent = total; }
+
+    // Drag start / touch support: use pointer events to move element visually for drag on touch devices
+    let dragging = false;
+    let offset = {x:0,y:0};
+
+    numberEl.addEventListener('pointerdown', e=>{
+      numberEl.setPointerCapture(e.pointerId);
+      dragging = true;
+      numberEl.style.transition = 'none';
+      const rect = numberEl.getBoundingClientRect();
+      offset.x = e.clientX - rect.left;
+      offset.y = e.clientY - rect.top;
+      numberEl.style.position = 'absolute';
+      numberEl.style.zIndex = 9999;
+      moveTo(e.clientX - offset.x, e.clientY - offset.y);
+    });
+
+    document.addEventListener('pointermove', e=>{
+      if(!dragging) return;
+      moveTo(e.clientX - offset.x, e.clientY - offset.y);
+    });
+
+    document.addEventListener('pointerup', e=>{
+      if(!dragging) return;
+      dragging = false;
+      numberEl.style.transition = '';
+      numberEl.style.position = '';
+      numberEl.style.zIndex = '';
+      try{ numberEl.releasePointerCapture(e.pointerId);}catch(err){}
+      // detect drop target
+      const drop = elementUnderPoint(e.clientX, e.clientY);
+      handleDropTarget(drop);
+    });
+
+    function moveTo(x,y){
+      numberEl.style.left = x + 'px';
+      numberEl.style.top = y + 'px';
+    }
+
+    function elementUnderPoint(x,y){
+      const el = document.elementFromPoint(x,y);
+      if(!el) return null;
+      if(el === oddHouse || (el.closest && el.closest('.house') === oddHouse)) return oddHouse;
+      if(el === evenHouse || (el.closest && el.closest('.house') === evenHouse)) return evenHouse;
+      return null;
+    }
+
+    function handleDropTarget(target){
+      total++;
+      const isOdd = current % 2 !== 0;
+      if(target === oddHouse && isOdd){ correct++; speak("Barakalla! Toq son"); celebrate(); }
+      else if(target === evenHouse && !isOdd){ correct++; speak("Barakalla! Juft son"); celebrate(); }
+      else { speak("Yana urinib ko'r!"); shake(numberEl); }
+      updateScore();
+      setTimeout(()=>{ newNumber(); resetNumberPosition(); }, 700);
+    }
+
+    // also allow tapping houses for accessibility
+    oddHouse.addEventListener('click', ()=>{
+      total++; if(current%2!==0){ correct++; speak("Barakalla! Toq son"); celebrate(); } else { speak("Yana urinib ko'r!"); shake(numberEl);} updateScore(); setTimeout(()=>newNumber(),600);
+    });
+    evenHouse.addEventListener('click', ()=>{
+      total++; if(current%2===0){ correct++; speak("Barakalla! Juft son"); celebrate(); } else { speak("Yana urinib ko'r!"); shake(numberEl);} updateScore(); setTimeout(()=>newNumber(),600);
+    });
+
+    // keyboard support
+    document.addEventListener('keydown', e=>{
+      if(e.key === 'ArrowLeft') oddHouse.click();
+      if(e.key === 'ArrowRight') evenHouse.click();
+    });
+
+    function shake(el){
+      el.animate([{transform:'translateX(0)'},{transform:'translateX(-12px)'},{transform:'translateX(12px)'},{transform:'translateX(0)'}],{duration:360});
+    }
+
+    function celebrate(){
+      numberEl.animate([{transform:'scale(1)'},{transform:'scale(1.18)'},{transform:'scale(1)'}],{duration:520});
+    }
+
+    function resetNumberPosition(){
+      numberEl.style.left = ''; numberEl.style.top = '';
+    }
+
+    nextBtn.addEventListener('click', newNumber);
+    resetBtn.addEventListener('click', ()=>{ correct=0; total=0; updateScore(); newNumber(); speak("O'yin qayta boshlandi"); });
+
+    updateScore();
+    newNumber();
+
+  </script>
+</body>
+</html>
